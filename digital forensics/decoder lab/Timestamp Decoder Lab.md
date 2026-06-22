@@ -85,7 +85,7 @@ A JWT is a token used to authenticate users in modern web applications. It consi
 header.payload.signature
 ```
 
-The payload contains claims including timestamps that tell you when the session started and when it expires. Notably, JWTs are encoded, not encrypted, meaning anyone who intercepts one can decode the payload without a key. This makes them highly valuable in a forensic investigation.
+The payload contains claims — including timestamps that tell you when the session started and when it expires. Crucially, JWTs are encoded, not encrypted, meaning anyone who intercepts one can decode the payload without a key. This makes them highly valuable in a forensic investigation.
 
 ### Acquiring a JWT
 
@@ -119,7 +119,7 @@ The full token was pasted into [jwt.io](https://jwt.io), which automatically spl
 
 ![jwt.io decode result](/digital%20forensics/decoder%20lab/jwt/jwtdecoded.png)
 
-The `sub` field is the subject — a unique identifier for the user. The `iat` and `exp` fields are Unix epoch timestamps.
+The `sub` field is the subject — a unique identifier for the user. The `iat` and `exp` fields are Unix epoch timestamps — plain integers representing a point in time as a count of seconds elapsed since 1 January 1970 00:00:00 UTC.
 
 #### Problems encountered
 
@@ -143,3 +143,156 @@ With the epoch values extracted, each was entered into DCode as **Numeric** and 
 ### Key takeaway
 
 The session was created on **19 June 2026** and was valid until **26 June 2026** — a 7 day window, typical of a refresh token lifecycle. In a forensic investigation this establishes exactly when a user authenticated and how long they had valid access, even if they only logged in once. Because JWTs are only encoded and not encrypted, this information is recoverable from any intercepted token without needing server-side access.
+
+---
+
+## Log Files
+
+### What are system logs?
+
+System logs record events on a machine — service changes, authentication attempts, process activity, errors. Each entry includes a timestamp, event ID, source, and context. They are a primary evidence source in digital forensic investigations.
+
+### Acquiring a log entry
+
+Windows Event Viewer was used to retrieve a real system log entry. Opened via `Win + R → eventvwr`, navigating to **Windows Logs → System** and selecting an event in the detailed (XML) view.
+
+![Event Viewer entry](/digital%20forensics/decoder%20lab/logs/eventviewerentry.png)
+
+The full event captured was:
+
+```
+- System
+  - Provider
+     [ Name]  Service Control Manager
+     [ Guid]  {555908d1-a6d7-4695-8e1e-26931d2012f4}
+  - EventID 7040
+     [ Qualifiers]  16384
+  - TimeCreated
+     [ SystemTime]  2026-06-22T11:57:56.2991034Z
+    EventRecordID 24532
+  - Execution
+     [ ProcessID]  884
+     [ ThreadID]  1224
+    Channel System
+    Computer number1
+  - Security
+     [ UserID]  x-x-x-xx
+- EventData
+  param1 Background Intelligent Transfer Service
+  param2 auto start
+  param3 demand start
+  param4 BITS
+```
+
+Key fields at a glance:
+
+| Field | Value | Meaning |
+|---|---|---|
+| EventID | 7040 | Service startup type changed |
+| TimeCreated | 2026-06-22T11:57:56.2991034Z | When it happened |
+| ProcessID | 884 | Process that triggered it |
+| UserID | S-1-5-18 | SYSTEM account — OS-level action |
+| Computer | number1 | Machine it occurred on |
+| EventData | BITS: auto start → demand start | What changed |
+
+The timestamp format is **ISO 8601** — identifiable by three characteristics: the `yyyy-MM-dd` date order with dashes, the `T` separator between date and time, and the `Z` suffix denoting UTC (Zulu time). Once recognised, ISO 8601 is human-readable without any decoding. The value and meaning are visible at a glance.
+
+### What this log entry tells us
+
+In an investigation this event is significant because BITS (Background Intelligent Transfer Service) is commonly abused by malware for stealthy file downloads. A change to its startup type warrants investigation. Combined with the ProcessID and timestamp, this entry can be correlated against other logs to build a timeline and determine whether the change was legitimate or suspicious.
+
+### Decoding the timestamp
+
+#### Why use DCode if the timestamp is already readable?
+
+DCode's value is not in reading human-readable formats like ISO 8601 or RFC 7231. Those can be read directly. DCode is essential when timestamps are raw numbers with no formatting: Windows FILETIME values from registry keys, Chromium timestamps from browser artifacts, GPS time from device logs, or any epoch value pulled from a binary file or database. In those cases DCode takes an unknown number, runs it against every known format simultaneously, and identifies the correct one by which result produces a plausible current date.
+
+For this lab, DCode is used to practice that workflow, converting the ISO 8601 timestamp to epoch first, then decoding it as Unix Seconds.
+
+#### Problems encountered
+
+DCode does not handle ISO 8601 timestamps well. Three variations were attempted:
+
+- Full timestamp with fractional seconds: `2026-06-22T11:57:56.2991034Z` → wrong result
+- Stripped fractional seconds: `2026-06-22T11:57:56Z` → wrong result
+- Stripped Z suffix: `2026-06-22T11:57:56` → wrong result
+
+DCode returned a Windows FILETIME value dated to 1601 in all cases.
+
+**Resolution:** The timestamp was converted to Unix epoch first using [epochconverter.com](https://www.epochconverter.com), which returned:
+
+```
+1782129476
+```
+
+The decimal portion (`.299`) was dropped — epoch timestamps are whole seconds. The fractional part represents milliseconds, which would require the **Unix Milliseconds** format and multiplying the value by 1000. For this lab Unix Seconds is sufficient.
+
+![Epoch converter result](/digital%20forensics/decoder%20lab/logs/epochconverter.png)
+
+#### Decoding in DCode
+
+The epoch value `1782129476` was entered into DCode as **Numeric**. The correct result was identified as **Unix Seconds**:
+
+| Format | Result |
+|---|---|
+| Unix Seconds (UTC) | 22/06/2026 11:57:56 |
+| Unix Seconds (Local / SAST) | 22/06/2026 13:57:56 |
+
+![DCode log result](/digital%20forensics/decoder%20lab/logs/dcodelogresult.png)
+
+### Key takeaway
+
+System log timestamps are ISO 8601 formatted and human-readable by design. DCode cannot parse them directly — convert to Unix epoch first using a tool like [epochconverter.com](https://www.epochconverter.com), then decode as Unix Seconds. The decoded timestamp, combined with the EventID, ProcessID, and UserID, gives a complete forensic picture of what happened, when, and under which account.
+
+---
+
+## Unix Epoch
+
+### What is a Unix epoch value?
+
+An epoch value is a plain integer representing a point in time as a count of seconds (or milliseconds) elapsed since **1 January 1970 00:00:00 UTC** — known as the Unix epoch. There is no formatting, no timezone label, no human-readable structure — just a number.
+
+For example:
+- `0` = 1 Jan 1970 00:00:00 UTC
+- `1750585090` = 22 Jun 2026 10:38:10 UTC
+
+Almost every programming language, database, and operating system stores time this way internally because it is simple to calculate with — subtraction gives duration, comparison gives order.
+
+### Seconds vs milliseconds
+
+The two variants encountered in practice:
+
+| Variant | Digit count | Example |
+|---|---|---|
+| Unix Seconds | 10 digits | `1782129476` |
+| Unix Milliseconds | 13 digits | `1782129476299` |
+
+The digit count is the quickest way to tell them apart at a glance. When in doubt, run both through DCode and pick the result that produces a plausible current date.
+
+### Where epoch values appear
+
+Epoch timestamps were encountered throughout this lab as the underlying representation behind every other format:
+
+- HTTP headers converted to epoch for DCode input
+- JWT `iat` and `exp` claims are epoch values in the raw payload
+- ISO 8601 log timestamps converted to epoch via epochconverter.com before decoding
+
+In a forensic investigation, raw epoch values commonly appear in registry keys, database records, binary file metadata, and network packet captures — often with no label indicating what format they are.
+
+### Decoding in DCode
+
+Enter the value as **Numeric** and identify **Unix Seconds** (or Unix Milliseconds for 13-digit values) as the correct row. All other formats will produce implausible dates. The format that returns a realistic current date is the right one.
+
+### Key takeaway
+
+Epoch is the common underlying format that most timestamp types reduce to. Recognising it by digit count, knowing whether to use seconds or milliseconds, and being able to convert to and from human-readable formats are foundational forensic skills that apply across every source covered in this lab.
+
+---
+
+## Tools Reference
+
+| Tool | Purpose | URL |
+|---|---|---|
+| DCode | Decode timestamps across multiple formats | — |
+| jwt.io | Decode and inspect JWT tokens | [jwt.io](https://jwt.io) |
+| Epoch Converter | Convert human-readable dates to Unix epoch and back | [epochconverter.com](https://www.epochconverter.com) |
