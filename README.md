@@ -1,0 +1,21 @@
+# networkinglabs
+
+A collection of hands-on labs covering networking, digital forensics, and information security concepts. Each lab is worked through independently using real tools and live environments rather than simulated or pre-generated data.
+
+## Structure
+
+Labs are organised by topic area. Each folder contains a write-up documenting the process, tools used, problems encountered, and key takeaways.
+
+## Topics Covered
+
+- **Digital Forensics** — timestamp decoding, artifact analysis, evidence handling
+- **Networking** — protocol analysis, traffic inspection, header examination
+- **Information Security** — authentication mechanisms, log analysis, token inspection
+
+## Tools Used
+
+Varies by lab. Commonly used tools include DCode, Wireshark, Microsoft Edge DevTools, Windows Event Viewer, jwt.io, and epochconverter.com.
+
+## Notes
+
+Labs are completed as part of an Occupational Certificate in Cybersecurity Analysis. Write-ups are documented for learning and portfolio purposes. Any sensitive data captured during labs (hostnames, SIDs, credentials) is redacted before publishing.
