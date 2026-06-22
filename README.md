@@ -16,6 +16,16 @@ Labs are organised by topic area. Each folder contains a write-up documenting th
 
 Varies by lab. Commonly used tools include DCode, Wireshark, Microsoft Edge DevTools, Windows Event Viewer, jwt.io, and epochconverter.com.
 
+<a href="https://www.digital-detective.net/dcode/" title="DCode">
+  <img src="./assets/icons/dcode.png" width="32" height="32" alt="DCode"/>
+</a>
+<a href="https://jwt.io" title="jwt.io">
+  <img src="./assets/icons/jwtio.png" width="32" height="32" alt="jwt.io"/>
+</a>
+<a href="https://epochconverter.com" title="Epoch Converter">
+  <img src="./assets/icons/epochconverter.png" width="32" height="32" alt="Epoch Converter"/>
+</a>
+
 ## Notes
 
 Labs are completed as part of an Occupational Certificate in Cybersecurity Analysis. Write-ups are documented for learning and portfolio purposes. Any sensitive data captured during labs (hostnames, SIDs, credentials) is redacted before publishing.
